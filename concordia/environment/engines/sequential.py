@@ -124,18 +124,10 @@ class Sequential(engine_lib.Engine):
     if log is not None and hasattr(game_master, 'get_last_log'):
       assert hasattr(game_master, 'get_last_log')  # Assertion for pytype
       log_entry['next_acting'] = game_master.get_last_log()  # pyrefly: ignore[unsupported-operation]
-    next_action_spec_string = game_master.act(
-        action_spec=entity_lib.ActionSpec(
-            call_to_action=self._call_to_next_action_spec.format(
-                name=next_object_name),
-            output_type=entity_lib.OutputType.NEXT_ACTION_SPEC,
-        )
+    next_action_spec = entity_lib.ActionSpec(
+        call_to_action=f"What does {next_object_name} do?",
+        output_type=entity_lib.OutputType.FREE,
     )
-    if log is not None and hasattr(game_master, 'get_last_log'):
-      assert hasattr(game_master, 'get_last_log')  # Assertion for pytype
-      log_entry['next_action_spec'] = game_master.get_last_log()  # pyrefly: ignore[unsupported-operation]
-    next_action_spec = engine_lib.action_spec_parser(next_action_spec_string)
-
     # Validate entity name from LLM to prevent KeyError
     if next_object_name not in entities_by_name:
       raise ValueError(
@@ -172,21 +164,16 @@ class Sequential(engine_lib.Engine):
       print(termcolor.colored(
           f'The resolved event was: {result}', _PRINT_COLOR))
 
-  def terminate(self,
-                game_master: entity_lib.Entity,
-                verbose: bool = False) -> bool:
-    """Decide if the episode should terminate."""
-    should_terminate_string = game_master.act(
-        action_spec=entity_lib.ActionSpec(
-            call_to_action=self._call_to_check_termination,
-            output_type=entity_lib.OutputType.TERMINATE,
-            options=tuple(entity_lib.BINARY_OPTIONS.values()),
-        )
-    )
-    if verbose:
-      print(termcolor.colored(
-          f'Terminate? {should_terminate_string}', _PRINT_COLOR))
-    return should_terminate_string == entity_lib.BINARY_OPTIONS['affirmative']
+  def terminate(
+    self,
+    game_master: entity_lib.Entity,
+    verbose: bool = False,
+    ) -> bool:
+        """Do not use an LLM termination check.
+
+        The simulation will terminate when max_steps is reached.
+        """
+        return False
 
   def next_game_master(self,
                        game_master: entity_lib.Entity,

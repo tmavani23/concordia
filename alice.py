@@ -8,7 +8,7 @@ from concordia.typing import entity
 
 
 # --------------------------------------------------
-# 1. Set up Llama 3
+# 1. Ollama / Llama 3
 # --------------------------------------------------
 
 model = language_models.language_model_setup(
@@ -18,7 +18,7 @@ model = language_models.language_model_setup(
 
 
 # --------------------------------------------------
-# 2. Temporary dummy embedder
+# 2. Temporary embedder
 # --------------------------------------------------
 
 class DummyEmbedder:
@@ -33,14 +33,14 @@ embedder = DummyEmbedder()
 
 
 # --------------------------------------------------
-# 3. Create Alice's memory
+# 3. Alice's memory
 # --------------------------------------------------
 
-alice_memory = basic_associative_memory.AssociativeMemoryBank(
+memory_bank = basic_associative_memory.AssociativeMemoryBank(
     sentence_embedder=embedder
 )
 
-alice_memory.extend([
+memory_bank.extend([
     "Alice is a 21-year-old computer science student.",
     "Alice is curious and enjoys learning about artificial intelligence.",
     "Alice enjoys dancing and listening to music.",
@@ -50,31 +50,17 @@ alice_memory.extend([
 
 
 # --------------------------------------------------
-# 4. Create Bob's memory
-# --------------------------------------------------
-
-bob_memory = basic_associative_memory.AssociativeMemoryBank(
-    sentence_embedder=embedder
-)
-
-bob_memory.extend([
-    "Bob is a 22-year-old economics student.",
-    "Bob is outgoing and enjoys meeting new people.",
-    "Bob enjoys playing basketball.",
-    "Bob values his friendships.",
-    "Bob is spontaneous and likes trying new things.",
-])
-
-
-# --------------------------------------------------
-# 5. Create the agents
+# 4. Get the actual basic Entity prefab
 # --------------------------------------------------
 
 prefabs = helper_functions.get_package_classes(entity_prefabs)
 
 alice_prefab = prefabs["basic__Entity"]
-bob_prefab = prefabs["basic__Entity"]
 
+
+# --------------------------------------------------
+# 5. Configure Alice
+# --------------------------------------------------
 
 alice_prefab.params["name"] = "Alice"
 alice_prefab.params["goal"] = (
@@ -82,88 +68,52 @@ alice_prefab.params["goal"] = (
     "and have meaningful conversations."
 )
 
-bob_prefab.params["name"] = "Bob"
-bob_prefab.params["goal"] = (
-    "Have interesting conversations, meet new people, "
-    "and enjoy new experiences."
-)
 
+# --------------------------------------------------
+# 6. Build Alice
+# --------------------------------------------------
 
 alice = alice_prefab.build(
     model=model,
-    memory_bank=alice_memory,
-)
-
-bob = bob_prefab.build(
-    model=model,
-    memory_bank=bob_memory,
+    memory_bank=memory_bank,
 )
 
 
 # --------------------------------------------------
-# 6. Conversation loop
+# 7. Give Alice an observation
 # --------------------------------------------------
 
-action_spec = entity.ActionSpec(
-    call_to_action="What do you do next?",
-    output_type=entity.OutputType.FREE,
-)
-
-situation = (
-    "Alice and Bob are both sitting in a university coffee shop. "
-    "They have never met before. Bob notices Alice working on her laptop."
-)
-
-print("\n" + "=" * 60)
-print("CONVERSATION")
-print("=" * 60)
-
-print("\nInitial situation:")
-print(situation)
+observations = [
+    "Alice has finished studying for the day and has some free time.",
+    "Alice receives a message from a close friend asking if she wants to hang out.",
+    "Alice realizes she has an important assignment due tomorrow.",
+    "Alice finishes her assignment and has some time to herself again.",
+]
 
 
-# Give both agents the initial situation
-alice.observe(situation)
-bob.observe(situation)
+for i, observation in enumerate(observations, start=1):
 
+    print(f"\n{'=' * 50}")
+    print(f"ROUND {i}")
+    print(f"{'=' * 50}")
 
-# Keep track of the most recent action
-last_action = None
+    print("\nObservation:")
+    print(observation)
 
+    alice.observe(observation)
 
-for round_number in range(1, 11):
-
-    print(f"\n{'-' * 60}")
-    print(f"ROUND {round_number}")
-    print(f"{'-' * 60}")
-
-    # -------------------------
-    # Alice's turn
-    # -------------------------
-
-    if last_action is not None:
-        alice.observe(
-            "Bob just did the following:\n" + last_action
-        )
-
-    alice_action = alice.act(action_spec)
-
-    print("\nAlice:")
-    print(alice_action)
-
-    # -------------------------
-    # Bob's turn
-    # -------------------------
-
-    bob.observe(
-        "Alice just did the following:\n" + alice_action
+    action_spec = entity.ActionSpec(
+        call_to_action="What do you do next?",
+        output_type=entity.OutputType.FREE,
     )
 
-    bob_action = bob.act(action_spec)
+    action = alice.act(action_spec)
 
-    print("\nBob:")
-    print(bob_action)
+    print("\nAlice's action:")
+    print(action)
 
-    # Bob's action becomes the context
-    # for Alice's next turn.
-    last_action = bob_action
+    # Store what happened as a memory.
+    memory_bank.add(
+        f"Alice observed: {observation} "
+        f"Alice decided to: {action}"
+    )
